@@ -10,7 +10,7 @@ app = Flask(__name__)
 # Cross domain access.
 cors = CORS(app)
 
-MAX_SUBMIT_TIMES = 3
+MAX_SUBMIT_TIMES = 5
 
 
 def user_first_login(email):
@@ -126,7 +126,7 @@ def submit_answer():
         current_answer = get_user_answer(email)
         current_answer['submittedAnswer'].append({
             "codes": str(answer),
-            "submittedTime": str(datetime.now())
+            "submittedTime": str(datetime.now())[:19]
         })
         save_user_answer(email, current_answer)
         return json.dumps({'success': 'You have submitted your answer!'})
@@ -143,9 +143,13 @@ def get_challenge():
     if user_is_valid(email) and user_is_not_expired(email) and can_user_submit(
             email):
         current_answer = get_user_answer(email)
+        submit_history = []
+        if len(current_answer['submittedAnswer']) > 0:
+            for a in current_answer['submittedAnswer']:
+                submit_history.append(a['submittedTime'])
 
         return json.dumps({'question': """Find yourself in love with programming but haven't demonstrated it yet? No worries. Demonstrate your abilities by trying this challenge project in a language of your choice (we recommend Javascript). Write a program to unscramble anagrams (between 5 and 7 letters) and find the correct English word. (e.g. "leppa" would resolve to "apple", "ythitr" would resolve to "thirty", "gshinra" would resolve to "sharing")""",
-                           'deadLine': current_answer['deadLine']})
+                           'deadLine': current_answer['deadLine'], 'submitHistory': submit_history})
     else:
         return json.dumps({'error': 'Not valid for challenge question.'})
 
