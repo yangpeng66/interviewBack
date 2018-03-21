@@ -12,6 +12,7 @@ cors = CORS(app)
 
 MAX_SUBMIT_TIMES = 3
 
+
 def user_first_login(email):
     return not get_user_answer(email)
 
@@ -33,6 +34,7 @@ def init_user_answer(email):
         json.dump(data, outfile)
     return data
 
+
 def get_user_answer(email):
     file_name = '%s.json' % email
     folder_path = '/opt/rangal/1.0.0/candidateAnswers'
@@ -43,12 +45,14 @@ def get_user_answer(email):
     else:
         return None
 
+
 def save_user_answer(email, answer):
     file_name = '%s.json' % email
     folder_path = '/opt/rangal/1.0.0/candidateAnswers'
     full_path = "{0}/{1}".format(folder_path, file_name)
     with open(full_path, 'w') as outfile:
         json.dump(answer, outfile)
+
 
 def get_emailList():
     data = json.load(open('/opt/rangal/1.0.0/candidateInfo.json'))
@@ -64,7 +68,8 @@ def user_is_not_expired(email):
     current_time = datetime.now()
     answer = get_user_answer(email)
     if answer is not None:
-        dead_line = datetime.strptime(answer['deadLine'], "%Y-%m-%d %H:%M:%S.%f")
+        dead_line = datetime.strptime(answer['deadLine'],
+                                      "%Y-%m-%d %H:%M:%S.%f")
         return current_time < dead_line
     else:
         return True
@@ -88,7 +93,8 @@ def login():
     # if the user first time login
     if user_is_valid(email) and user_first_login(email):
         user_data = init_user_answer(email)
-        return json.dumps({'canProceed': True, 'deadLine': user_data['deadLine']})
+        return json.dumps(
+            {'canProceed': True, 'deadLine': user_data['deadLine']})
 
     # if the user not first time log in
     if user_is_valid(email):
@@ -96,11 +102,14 @@ def login():
         user_can_submit = can_user_submit(email)
         user_data = get_user_answer(email)
         if user_not_expired and user_can_submit:
-            return json.dumps({'canProceed': True, 'deadLine': user_data['deadLine']})
+            return json.dumps(
+                {'canProceed': True, 'deadLine': user_data['deadLine']})
         elif not user_not_expired:
-            return json.dumps({'canProceed': False, 'message': 'Expired, sorry.'})
+            return json.dumps(
+                {'canProceed': False, 'message': 'Expired, sorry.'})
         elif not user_can_submit:
-            return json.dumps({'canProceed': False, 'message': 'You have reached the limit!'})
+            return json.dumps(
+                {'canProceed': False, 'message': 'You have reached the limit!'})
 
 
 @app.route('/submit-answer', methods=['POST'])
@@ -122,15 +131,15 @@ def submit_answer():
         return json.dumps({'error': 'Not valid to submit, sorry.'})
 
 
-
 @app.route('/get-challenge', methods=['POST'])
 def get_challenge():
-    #user valid, not expire, can submit
+    # user valid, not expire, can submit
     data = request.get_json()
     email = data['email'].lower()
 
-    if user_is_valid(email) and user_is_not_expired(email) and can_user_submit(email):
-        return json.dumps({'question': 'this is question'})
+    if user_is_valid(email) and user_is_not_expired(email) and can_user_submit(
+            email):
+        return json.dumps({'question':"""Find yourself in love with programming but haven't demonstrated it yet? No worries. Demonstrate your abilities by trying this challenge project in a language of your choice (we recommend Javascript). Write a program to unscramble anagrams (between 5 and 7 letters) and find the correct English word. (e.g. "leppa" would resolve to "apple", "ythitr" would resolve to "thirty", "gshinra" would resolve to "sharing")"""})
     else:
         return json.dumps({'error': 'Not valid for challenge question.'})
 
