@@ -1,6 +1,6 @@
 import json
-import os, sys
-
+import os, time, unicodedata, sys
+from datetime import datetime, timedelta
 
 from flask import Flask, request
 from flask_cors import CORS
@@ -10,96 +10,130 @@ app = Flask(__name__)
 # Cross domain access.
 cors = CORS(app)
 
+MAX_SUBMIT_TIMES = 3
+
+def user_first_login(email):
+    return not get_user_answer(email)
+
+
+def init_user_answer(email):
+    file_name = '%s.json' % email
+    folder_path = '/opt/rangal/1.0.0/candidateAnswers'
+    full_path = "{0}/{1}".format(folder_path, file_name)
+    start_time = datetime.now()
+    twentyfour_hours_from_start_time = start_time + timedelta(hours=24)
+    data = {
+        "emailAddress": email,
+        "startTime": str(start_time),
+        "deadLine": str(twentyfour_hours_from_start_time),
+        "isAnswerSubmitted": False,
+        "submittedAnswer": []
+    }
+    with open(full_path, 'w') as outfile:
+        json.dump(data, outfile)
+    return data
+
+def get_user_answer(email):
+    file_name = '%s.json' % email
+    folder_path = '/opt/rangal/1.0.0/candidateAnswers'
+    full_path = "{0}/{1}".format(folder_path, file_name)
+    if os.path.exists(full_path):
+        with open(full_path) as json_data:
+            return json.load(json_data)
+    else:
+        return None
+
+def save_user_answer(email, answer):
+    file_name = '%s.json' % email
+    folder_path = '/opt/rangal/1.0.0/candidateAnswers'
+    full_path = "{0}/{1}".format(folder_path, file_name)
+    with open(full_path, 'w') as outfile:
+        json.dump(answer, outfile)
+
+def get_emailList():
+    data = json.load(open('/opt/rangal/1.0.0/candidateInfo.json'))
+    return data["validCandidateEmails"]
+
+
+def user_is_valid(email):
+    valid_candidate_email_list = get_emailList()
+    return email in valid_candidate_email_list
+
+
+def user_is_not_expired(email):
+    current_time = datetime.now()
+    answer = get_user_answer(email)
+    if answer is not None:
+        dead_line = datetime.strptime(answer['deadLine'], "%Y-%m-%d %H:%M:%S.%f")
+        return current_time < dead_line
+    else:
+        return True
+
+
+def can_user_submit(email):
+    user_data = get_user_answer(email)
+    return len(user_data['submittedAnswer']) < MAX_SUBMIT_TIMES
+
 
 @app.route('/')
 def info():
     return 'This is the InterviewWebApp from Smartorg'
 
 
-@app.route('/login', methods=['GET'])
-def login1():
-    return "hello hi"
-
 @app.route('/login', methods=['POST'])
 def login():
-    #get all valid candidates email address
-    def get_emailList():
-        data = json.load(open('/opt/rangal//1.0.0/candidateInfo.json'))
-        return data["validCandidateEmails"]
-
-    valid_candidate_email_list = get_emailList()
-
     data = request.get_json()
-    email = data['email']
+    email = data['email'].lower()
 
     # if the user first time login
-    if email in valid_candidate_email_list and not os.path.exists(
-                    '%s.json' % email):
-        os.makedirs('%s.json' % email)
-        with open('%s.json' % email) as json_data:
-            json_obj = json.load(json_data)
-            json_obj['candidate'] = {
-                "emailAddress": "e@e",
-                "startTime": "",
-                "isAnswerSubmitted": False,
-                "submittedAnswer": {
-                    "codes": ""
-                },
-                "submittedTime": ""
-            }
-            with open('%s.json' % email, 'w') as j:
-                json.dump(json_obj, j)
+    if user_is_valid(email) and user_first_login(email):
+        user_data = init_user_answer(email)
+        return json.dumps({'canProceed': True, 'deadLine': user_data['deadLine']})
 
-    #if the user not first time log in and before deadline
-    if os.path.exists('%s.json' % email):
-        with open('%s.json' % email) as json_data:
-            json_obj = json.load(json_data)
-            # if current time - start time < 24 hours and submitted is false:
-            #     with open('%s.json' % email, 'w') as j:
-            #         json.dump(json_obj, j)
-            #             return left time
-            # if current time - start time > 24 hours and submitted is false:
-            #     return "You run out of time, Sorry!"
-
-    #if the user login after submitted
-    if os.path.exists('%s.json' % email):
-        with open('%s.json' % email) as json_data:
-            json_obj = json.load(json_data)
-            # if submitted is true and current time - start time < 24 hours:
-            #   with open('%s.json' % email, 'w') as j:
-            #         json.dump(json_obj, j)
-            #             return left time and you can resubmit
-            # if submitted is true and current time - start time >= 24 hours:
-            #   with open('%s.json' % email, 'w') as j:
-            #         json.dump(json_obj, j)
-            #             return "you have submitted, relax!"
+    # if the user not first time log in
+    if user_is_valid(email):
+        user_not_expired = user_is_not_expired(email)
+        user_can_submit = can_user_submit(email)
+        user_data = get_user_answer(email)
+        if user_not_expired and user_can_submit:
+            return json.dumps({'canProceed': True, 'deadLine': user_data['deadLine']})
+        elif not user_not_expired:
+            return json.dumps({'canProceed': False, 'message': 'Expired, sorry.'})
+        elif not user_can_submit:
+            return json.dumps({'canProceed': False, 'message': 'You have reached the limit!'})
 
 
-@app.route('/submit-answer/<email>/<answer>', methods=['POST'])
-def submit_answer(email, answer):
-    if os.path.exists('%s.json' % email):
-        with open('%s.json' % email) as json_data:
-            json_obj = json.load(json_data)
-            # if submitted is false and current time - start time <= 24 hours:
-            #     json_obj['candidate']['submittedAnswer'] = answer
-            #     with open('%s.json' % email, 'w') as j:
-            #         json.dump(json_obj, j)
-            #         return left time and you can resubmit
-            # if submitted is false and current time - start time > 24 hours:
-            #     json_obj['candidate']['submittedAnswer'] = answer
-            #     with open('%s.json' % email, 'w') as j:
-            #         json.dump(json_obj, j)
-            #         return run out of time, sorry
-            # if submitted is true and current time - start time <= 24 hours:
-            #     json_obj['candidate']['submittedAnswer'] = answer
-            #     with open('%s.json' % email, 'w') as j:
-            #         json.dump(json_obj, j)
-            #         return left time and you can resubmit
-            # if submitted is true and current time - start time >= 24 hours:
-            #     json_obj['candidate']['submittedAnswer'] = answer
-            #     with open('%s.json' % email, 'w') as j:
-            #         json.dump(json_obj, j)
-            #         return you have submitted, relax!
+@app.route('/submit-answer', methods=['POST'])
+def submit_answer():
+    data = request.get_json()
+    email = data['email'].lower()
+    answer = data['answer']
+
+    if user_is_valid(email) and user_is_not_expired(email) and can_user_submit(
+            email):
+        current_answer = get_user_answer(email)
+        current_answer['submittedAnswer'].append({
+            "codes": str(answer),
+            "submittedTime": str(datetime.now())
+        })
+        save_user_answer(email, current_answer)
+        return json.dumps({'success': 'You have submitted your answer!'})
+    else:
+        return json.dumps({'error': 'Not valid to submit, sorry.'})
+
+
+
+@app.route('/get-challenge', methods=['POST'])
+def get_challenge():
+    #user valid, not expire, can submit
+    data = request.get_json()
+    email = data['email'].lower()
+
+    if user_is_valid(email) and user_is_not_expired(email) and can_user_submit(email):
+        return json.dumps({'question': 'this is question'})
+    else:
+        return json.dumps({'error': 'Not valid for challenge question.'})
+
 
 if __name__ == '__main__':
     app.run()
