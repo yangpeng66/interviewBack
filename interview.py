@@ -26,7 +26,7 @@ def init_user_answer(email):
     data = {
         "emailAddress": email,
         "startTime": str(start_time),
-        "deadLine": str(twentyfour_hours_from_start_time),
+        "deadLine": str(twentyfour_hours_from_start_time)[:19],
         "isAnswerSubmitted": False,
         "submittedAnswer": []
     }
@@ -69,7 +69,7 @@ def user_is_not_expired(email):
     answer = get_user_answer(email)
     if answer is not None:
         dead_line = datetime.strptime(answer['deadLine'],
-                                      "%Y-%m-%d %H:%M:%S.%f")
+                                      "%Y-%m-%d %H:%M:%S")
         return current_time < dead_line
     else:
         return True
@@ -110,6 +110,9 @@ def login():
         elif not user_can_submit:
             return json.dumps(
                 {'canProceed': False, 'message': 'You have reached the limit!'})
+    else:
+        return json.dumps({'canProceed': False,
+                           'message': 'Your email has not in the ststem, please contack Melinda Gurman through email:mgurman@smartorg.com'})
 
 
 @app.route('/submit-answer', methods=['POST'])
@@ -139,7 +142,10 @@ def get_challenge():
 
     if user_is_valid(email) and user_is_not_expired(email) and can_user_submit(
             email):
-        return json.dumps({'question':"""Find yourself in love with programming but haven't demonstrated it yet? No worries. Demonstrate your abilities by trying this challenge project in a language of your choice (we recommend Javascript). Write a program to unscramble anagrams (between 5 and 7 letters) and find the correct English word. (e.g. "leppa" would resolve to "apple", "ythitr" would resolve to "thirty", "gshinra" would resolve to "sharing")"""})
+        current_answer = get_user_answer(email)
+
+        return json.dumps({'question': """Find yourself in love with programming but haven't demonstrated it yet? No worries. Demonstrate your abilities by trying this challenge project in a language of your choice (we recommend Javascript). Write a program to unscramble anagrams (between 5 and 7 letters) and find the correct English word. (e.g. "leppa" would resolve to "apple", "ythitr" would resolve to "thirty", "gshinra" would resolve to "sharing")""",
+                           'deadLine': current_answer['deadLine']})
     else:
         return json.dumps({'error': 'Not valid for challenge question.'})
 
