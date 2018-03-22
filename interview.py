@@ -74,6 +74,10 @@ def user_is_not_expired(email):
     else:
         return True
 
+def reach_start_time():
+    current_time = datetime.now()
+    start_time = datetime(2018, 3, 22, 00, 00, 00, 00000)
+    return start_time <= current_time
 
 def can_user_submit(email):
     user_data = get_user_answer(email)
@@ -90,6 +94,8 @@ def login():
     data = request.get_json()
     email = data['email'].lower()
 
+    if not reach_start_time():
+        return json.dumps({'canProceed': False, 'message': 'The challenge has not start yet.'})
     # if the user first time login
     if user_is_valid(email) and user_first_login(email):
         user_data = init_user_answer(email)
